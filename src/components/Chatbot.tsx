@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, User, GraduationCap, Users, Eye, Bot, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { collegeData, faqData, type UserRole, roleDescriptions } from '@/data/collegeData';
+import { type UserRole, roleDescriptions } from '@/data/collegeData';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 type Message = {
   id: string;
@@ -23,90 +25,6 @@ const roleColors: Record<UserRole, string> = {
   visitor: 'border-orange-500 hover:bg-orange-50',
 };
 
-function generateResponse(query: string, role: UserRole): string {
-  const q = query.toLowerCase();
-  
-  // Search FAQs
-  for (const category of faqData) {
-    for (const faq of category.questions) {
-      const keywords = faq.q.toLowerCase().split(' ');
-      const matchCount = keywords.filter(kw => kw.length > 3 && q.includes(kw)).length;
-      if (matchCount >= 2 || q.includes(faq.q.toLowerCase().slice(0, 20))) {
-        return faq.a;
-      }
-    }
-  }
-
-  // EAMCET code
-  if (q.includes('eamcet') || q.includes('code')) {
-    return `The EAMCET code for ${collegeData.shortName} is **${collegeData.eamcetCode}**. You can use this code during counseling to select our college.`;
-  }
-
-  // Placements
-  if (q.includes('placement') || q.includes('package') || q.includes('salary') || q.includes('job')) {
-    return `**Placement Highlights 2024:**\n\n- **Highest Package:** ${collegeData.placements.highestPackage} (PayPal)\n- **Total Placements:** ${collegeData.placements.totalPlacements}+ students\n- **Top Recruiters:** ${collegeData.placements.recruiters.slice(0, 8).join(', ')}\n\nTop companies like Microsoft, Amazon, and Accenture regularly recruit from our campus!`;
-  }
-
-  // Courses
-  if (q.includes('course') || q.includes('branch') || q.includes('program') || q.includes('btech') || q.includes('mtech')) {
-    const courses = collegeData.courses.undergraduate.map(c => `- ${c.name} (${c.code}): ${c.intake} seats`).join('\n');
-    return `**B.Tech Programs at CMRCET:**\n\n${courses}\n\nWe also offer M.Tech and MBA programs. Would you like details on any specific course?`;
-  }
-
-  // Location
-  if (q.includes('location') || q.includes('address') || q.includes('where') || q.includes('reach')) {
-    return `**Campus Location:**\n\n📍 ${collegeData.location.address}\n\n- ${collegeData.location.distance}\n- On ${collegeData.location.highway}\n- ${collegeData.location.campus}\n\nTransport facilities are available covering major areas of Hyderabad.`;
-  }
-
-  // Accreditation
-  if (q.includes('naac') || q.includes('nirf') || q.includes('ranking') || q.includes('accredit')) {
-    const accreds = collegeData.accreditations.map(a => `- **${a.name}:** ${a.grade || a.rank || a.status}`).join('\n');
-    return `**Accreditations & Rankings:**\n\n${accreds}\n\nWe are proud to be ranked in NIRF for 8 consecutive years!`;
-  }
-
-  // Fees (general response)
-  if (q.includes('fee') || q.includes('cost') || q.includes('tuition')) {
-    return `For detailed fee structure, please contact our admissions office:\n\n📞 +91-40-64635858\n📧 admissions@cmrcet.ac.in\n\nFee payment can be done through the college portal. Would you like information about scholarships?`;
-  }
-
-  // Hostel
-  if (q.includes('hostel') || q.includes('accommodation') || q.includes('stay')) {
-    return `**Hostel Facilities:**\n\n- Separate hostels for boys and girls\n- Modern amenities and 24/7 security\n- Mess facility with nutritious food\n- Wi-Fi connectivity\n- Recreation areas\n\nFor hostel admission, contact the admissions office.`;
-  }
-
-  // Admission
-  if (q.includes('admission') || q.includes('apply') || q.includes('join')) {
-    return `**Admission Process:**\n\n1. Qualify in TS EAMCET / AP EAMCET\n2. Participate in counseling through TSCHE/APSCHE\n3. Select CMRCET using code: **CMRK**\n\n**Eligibility:** 10+2 with Physics, Chemistry & Mathematics\n\nAdmission office: 10:00 AM to 04:00 PM`;
-  }
-
-  // Contact
-  if (q.includes('contact') || q.includes('phone') || q.includes('email') || q.includes('call')) {
-    return `**Contact Information:**\n\n📞 ${collegeData.contact.phone.join(' / ')}\n📧 ${collegeData.contact.email}\n🌐 ${collegeData.contact.website}\n\n📍 ${collegeData.location.address}`;
-  }
-
-  // Role-specific responses
-  if (role === 'student') {
-    if (q.includes('lms') || q.includes('portal')) {
-      return `Students can access the Learning Management System (LMS) through the college portal. Your login credentials are provided by the IT department during admission. For any access issues, contact the IT helpdesk.`;
-    }
-  }
-
-  if (role === 'faculty') {
-    if (q.includes('research') || q.includes('publication')) {
-      return `**Research at CMRCET:**\n\n- Multiple research centers across departments\n- Funded projects from government and industry\n- Support for patent filing\n- Collaboration opportunities with top institutions\n\nContact the R&D cell for research proposals.`;
-    }
-  }
-
-  if (role === 'parent') {
-    if (q.includes('safe') || q.includes('security')) {
-      return `**Campus Safety:**\n\n- 24/7 security with CCTV surveillance\n- Secure, gated campus\n- Anti-ragging measures strictly enforced\n- Medical facilities available\n- Regular parent-teacher meetings\n\nYour child's safety is our priority!`;
-    }
-  }
-
-  // Default response
-  return `Thank you for your question! Here are some topics I can help you with:\n\n- 📚 **Courses & Admissions** - Programs, eligibility, EAMCET code\n- 💼 **Placements** - Packages, recruiters, career support\n- 🏛️ **Campus & Facilities** - Location, hostel, infrastructure\n- 🏆 **Rankings** - NAAC, NIRF, accreditations\n- 📞 **Contact** - Phone, email, address\n\nPlease ask about any of these topics, and I'll be happy to help!`;
-}
-
 export function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
@@ -114,6 +32,7 @@ export function Chatbot() {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -144,20 +63,68 @@ export function Chatbot() {
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    const userInput = input;
     setInput('');
     setIsTyping(true);
 
-    // Simulate typing delay
-    setTimeout(() => {
-      const response = generateResponse(input, selectedRole);
+    try {
+      // Build conversation history for context
+      const conversationHistory = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+
+      const { data, error } = await supabase.functions.invoke('college-chatbot', {
+        body: {
+          message: userInput,
+          role: selectedRole,
+          conversationHistory: conversationHistory
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: response,
+        content: data.response,
       };
       setMessages((prev) => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error('Chatbot error:', error);
+      
+      // Show toast for rate limit or payment errors
+      if (error instanceof Error) {
+        if (error.message.includes('Rate limit') || error.message.includes('429')) {
+          toast({
+            title: "Please wait",
+            description: "Too many requests. Please try again in a moment.",
+            variant: "destructive"
+          });
+        } else if (error.message.includes('402') || error.message.includes('credits')) {
+          toast({
+            title: "Service unavailable",
+            description: "AI service is temporarily unavailable. Please try again later.",
+            variant: "destructive"
+          });
+        }
+      }
+
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: "I apologize, but I'm having trouble connecting right now. Please try again in a moment, or contact the college directly at +91-40-64635858.",
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
       setIsTyping(false);
-    }, 800);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -192,7 +159,7 @@ export function Chatbot() {
                 <Bot className="w-5 h-5 text-secondary-foreground" />
               </div>
               <div>
-                <h3 className="font-semibold">CMRCET Assistant</h3>
+                <h3 className="font-semibold">CMRCET AI Assistant</h3>
                 <p className="text-xs text-primary-foreground/70">
                   {selectedRole ? `Helping as ${selectedRole}` : 'Select your role'}
                 </p>
@@ -264,8 +231,9 @@ export function Chatbot() {
                 ))}
                 {isTyping && (
                   <div className="flex justify-start">
-                    <div className="bg-muted rounded-2xl rounded-bl-sm px-4 py-3">
-                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                    <div className="bg-muted rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">Thinking...</span>
                     </div>
                   </div>
                 )}
@@ -285,6 +253,7 @@ export function Chatbot() {
                   onKeyPress={handleKeyPress}
                   placeholder="Type your question..."
                   className="flex-1 px-4 py-3 bg-muted rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  disabled={isTyping}
                 />
                 <Button
                   variant="chat"
@@ -296,7 +265,7 @@ export function Chatbot() {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground text-center mt-2">
-                Ask about courses, placements, admissions & more
+                Powered by AI • Ask anything about CMRCET
               </p>
             </div>
           )}
