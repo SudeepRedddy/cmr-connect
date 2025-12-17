@@ -1,0 +1,4 @@
+project_id = "mxbcyifgvotrasamttop"
+
+[functions.college-chatbot]
+verify_jwt = false
