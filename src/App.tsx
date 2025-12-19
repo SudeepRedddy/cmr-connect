@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
+import SetupAdmin from "./pages/SetupAdmin";
 import StudentDashboard from "./pages/StudentDashboard";
 import FacultyDashboard from "./pages/FacultyDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -23,6 +24,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/setup-admin" element={<SetupAdmin />} />
             <Route path="/student" element={<StudentDashboard />} />
             <Route path="/faculty" element={<FacultyDashboard />} />
             <Route path="/admin" element={<AdminDashboard />} />
