@@ -141,39 +141,23 @@ const AdminDashboard = () => {
 
   const handleAddStudent = async () => {
     try {
-      // Create user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: newStudent.email,
-        password: newStudent.password,
-        options: {
-          data: { full_name: newStudent.full_name },
-          emailRedirectTo: `${window.location.origin}/`
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email: newStudent.email,
+          password: newStudent.password,
+          full_name: newStudent.full_name,
+          role: 'student',
+          additionalData: {
+            roll_number: newStudent.roll_number,
+            department: newStudent.department,
+            year: parseInt(newStudent.year),
+            section: newStudent.section || null,
+            batch_year: parseInt(newStudent.batch_year)
+          }
         }
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('Failed to create user');
-
-      // Add student role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({ user_id: authData.user.id, role: 'student' });
-
-      if (roleError) throw roleError;
-
-      // Add student data
-      const { error: studentError } = await supabase
-        .from('students')
-        .insert({
-          user_id: authData.user.id,
-          roll_number: newStudent.roll_number,
-          department: newStudent.department,
-          year: parseInt(newStudent.year),
-          section: newStudent.section || null,
-          batch_year: parseInt(newStudent.batch_year)
-        });
-
-      if (studentError) throw studentError;
+      if (error || data?.error) throw new Error(data?.error || error?.message);
 
       toast({ title: "Success", description: "Student added successfully" });
       setIsAddStudentOpen(false);
@@ -186,36 +170,23 @@ const AdminDashboard = () => {
 
   const handleAddFaculty = async () => {
     try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: newFaculty.email,
-        password: newFaculty.password,
-        options: {
-          data: { full_name: newFaculty.full_name },
-          emailRedirectTo: `${window.location.origin}/`
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email: newFaculty.email,
+          password: newFaculty.password,
+          full_name: newFaculty.full_name,
+          role: 'faculty',
+          additionalData: {
+            employee_id: newFaculty.employee_id,
+            department: newFaculty.department,
+            designation: newFaculty.designation,
+            specialization: newFaculty.specialization || null,
+            qualifications: newFaculty.qualifications || null
+          }
         }
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('Failed to create user');
-
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({ user_id: authData.user.id, role: 'faculty' });
-
-      if (roleError) throw roleError;
-
-      const { error: facultyError } = await supabase
-        .from('faculty')
-        .insert({
-          user_id: authData.user.id,
-          employee_id: newFaculty.employee_id,
-          department: newFaculty.department,
-          designation: newFaculty.designation,
-          specialization: newFaculty.specialization || null,
-          qualifications: newFaculty.qualifications || null
-        });
-
-      if (facultyError) throw facultyError;
+      if (error || data?.error) throw new Error(data?.error || error?.message);
 
       toast({ title: "Success", description: "Faculty added successfully" });
       setIsAddFacultyOpen(false);
