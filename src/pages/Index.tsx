@@ -4,7 +4,7 @@ import { CoursesSection } from '@/components/CoursesSection';
 import { PlacementsSection } from '@/components/PlacementsSection';
 import { AboutSection } from '@/components/AboutSection';
 import { Footer } from '@/components/Footer';
-import { Chatbot } from '@/components/Chatbot';
+import Chatbot from '@/components/Chatbot';
 
 const Index = () => {
   return (
