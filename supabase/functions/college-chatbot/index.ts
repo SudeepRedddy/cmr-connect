@@ -1,11 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// College data context for the AI
+// Static college context
 const collegeContext = `
 You are a helpful AI assistant for CMR College of Engineering & Technology (CMRCET), Hyderabad.
 
@@ -15,140 +16,133 @@ COLLEGE OVERVIEW:
 - Tagline: "Explore to Invent"
 - Established: 2002 (23+ years of excellence)
 - Location: Kandlakoya, Medchal Road, Hyderabad - 501401, Telangana
-- Distance: 20 Km from Secunderabad Railway Station on Hyderabad-Nagpur National Highway
 - Campus: 10 acres of serene, lush green and pollution-free environment
-- Sponsor: MGR Educational Society
 - EAMCET Code: CMRK
 
 ACCREDITATIONS & RANKINGS:
-- NAAC A+ Accredited (National Assessment and Accreditation Council)
-- NIRF Rank: 151-200 band (Engineering category, 2025) - 8th time in a row across TEN editions
-- NIRF Innovation Rank: 11-50 band (2024)
+- NAAC A+ Accredited
+- NIRF Rank: 151-200 band (Engineering category, 2025)
 - UGC Autonomous Status
-- NBA Accredited (National Board of Accreditation)
+- NBA Accredited
 - AICTE Approved
-- Affiliated to JNTU Hyderabad
 
 COURSES OFFERED:
-B.Tech Programs:
-- Computer Science and Engineering (CSE) - 180 intake
-- CSE (Data Science) - 120 intake
-- Information Technology (IT) - 120 intake
-- CSE (Artificial Intelligence & Machine Learning) - 60 intake
-- CSE (Cyber Security) - 60 intake
-- Electronics and Communication Engineering (ECE) - 120 intake
-- Electrical and Electronics Engineering (EEE) - 60 intake
-- Mechanical Engineering - 60 intake
-- Civil Engineering - 60 intake
-
-Postgraduate Programs:
-- M.Tech (CSE, ECE, EEE specializations)
-- MBA - 120 intake
+B.Tech Programs: CSE (180), CSE Data Science (120), IT (120), CSE AI/ML (60), CSE Cyber Security (60), ECE (120), EEE (60), MECH (60), CIVIL (60)
+M.Tech: CSE, ECE, EEE specializations
+MBA: 120 intake
 
 PLACEMENTS (2024-25):
-- Total Placements: 607+ students placed
+- 607+ students placed
 - Highest Package: 34.4 LPA (PayPal)
-- Top Recruiters by Package:
-  * PayPal: 34.4 LPA
-  * Siemens: 20.4 LPA
-  * Zenoti: 11.47 LPA
-  * Texas Instruments: 10.04 LPA
-  * Honeywell: 10.0 LPA
-- Major Recruiters: Microsoft, Amazon, JPMorgan Chase, Rubrik, Juspay, Zscaler, Amadeus, Deloitte, DeltaX, EPAM, DBS, Accolite Digital, Accenture, Infosys, Capgemini, LTIMindtree, Cognizant, PwC, TCS, Wipro, Tech Mahindra, IBM, Virtusa, UST, Hexaware, NTT Data, Ernst & Young, TATA Technologies, TATA Advanced Systems
-- Recruitment Stats: Accenture (456), Capgemini (472), Cognizant (231), Infosys (127), LTIMindtree (67), PwC (45)
+- Top Recruiters: Microsoft, Amazon, JPMorgan Chase, PayPal, Siemens, Texas Instruments
 
-FACILITIES:
-- Central Library with Digital Resources
-- Advanced Computer Labs
-- Research Centers
-- Sports Complex
-- Hostel Facilities (Boys & Girls separate)
-- Cafeteria
-- Wi-Fi Enabled Campus
-- Auditorium
-- Seminar Halls
-- Transportation covering major Hyderabad areas
-
-GOVERNANCE & PORTALS:
-- Samvidha: ERP System (for tracking attendance, grades, progress)
-- Akanksha: Learning Management System
-- eExamDesk: Examination Portal
-- Bristom: Feedback System
-- Build IT: Project Management
-- ESLO: Student Learning Outcomes
-
-RESEARCH:
-- Funded Projects
-- Research Centers
-- Industry Consultancy
-- Intellectual Property Assets (Patents filed and granted)
-- Technology Incubation
-- MSME ASPIRE - TBI
-- Institution Innovation Council
-- Collaborative research with top institutions
-- Start-up incubation center
-
-STUDENT ACTIVITIES:
-- SAE India - SUPRA, Bicycle, Effi-Cycle competitions
-- SAE Aero Design (International & National)
-- Hackathons and Coding Contests
-- Cultural Festivals
-- Technical Symposiums
-- CMR ThinkFest
-
-CONTACT INFORMATION:
-- Phone: +91-40-64635858, +91-40-64635859
+CONTACT:
+- Phone: +91-40-64635858
 - Email: info@cmrcet.ac.in
-- Admissions: admissions@cmrcet.ac.in
 - Website: https://cmrcet.ac.in
-- Timings: 10:00 AM to 04:00 PM
-
-ADMISSIONS:
-- Eligibility: 10+2 with Physics, Chemistry, and Mathematics
-- Process: Apply through TS EAMCET / AP EAMCET → Counseling through TSCHE/APSCHE → Use EAMCET Code: CMRK
-
-SOCIAL MEDIA:
-- Twitter: @cmrcet_official
-- Facebook: cmrcet
-- Instagram: @cmrcet_official
-- LinkedIn: cmrcet_official
-- YouTube: CMR College of Engineering & Technology
 `;
 
 const rolePrompts: Record<string, string> = {
-  student: `You are speaking to a current or prospective student. Focus on:
-- Course information, curriculum, and academic programs
-- Placement opportunities, companies, and packages
-- Campus life, activities, clubs, and events
-- Hostel, facilities, and student services
-- Admission process for prospective students
-Be friendly, encouraging, and informative. Use a peer-like tone.`,
-  
-  faculty: `You are speaking to a faculty member or staff. Focus on:
-- Academic resources and research opportunities
-- LMS (Akanksha) and administrative portals
-- Research centers, funded projects, and patents
-- Industry consultancy and collaboration
-- Professional development opportunities
-Be professional and supportive.`,
-  
-  parent: `You are speaking to a parent or guardian. Focus on:
-- Student safety and campus security
-- Academic progress tracking through Samvidha ERP
-- Transportation facilities and routes
-- Hostel accommodations and facilities
-- Placement record and career prospects
-- Fee structure and admission process
-Be reassuring, detailed, and professional.`,
-  
-  visitor: `You are speaking to a general visitor. Focus on:
-- Overview of the college and its achievements
-- Rankings, accreditations, and recognition
-- Programs offered and admission process
-- Contact information and how to visit
-- General information about the institution
-Be welcoming and informative.`
+  student: `You are speaking to a student. Focus on courses, placements, campus life, facilities. Be friendly and peer-like.`,
+  faculty: `You are speaking to a faculty member. Focus on academic resources, research, LMS portals. Be professional.`,
+  visitor: `You are speaking to a visitor. Focus on overview, rankings, admissions, contact info. Be welcoming.`
 };
+
+// Function to fetch dynamic data from database
+async function fetchDynamicContext(supabase: any): Promise<string> {
+  let dynamicContext = '\n\nDYNAMIC DATA FROM DATABASE:\n';
+
+  try {
+    // Fetch faculty data
+    const { data: facultyData } = await supabase
+      .from('faculty')
+      .select(`
+        employee_id,
+        department,
+        designation,
+        specialization,
+        qualifications,
+        experience_years,
+        profiles!faculty_user_id_fkey(full_name, email, phone)
+      `)
+      .limit(50);
+
+    if (facultyData && facultyData.length > 0) {
+      dynamicContext += '\nFACULTY MEMBERS:\n';
+      for (const f of facultyData) {
+        const profile = f.profiles;
+        const name = profile?.full_name || 'Unknown';
+        dynamicContext += `- ${name} (${f.designation}, ${f.department}): ${f.specialization || 'General'}, ${f.qualifications || ''}, ${f.experience_years || 0} years exp, Contact: ${profile?.email || 'N/A'}\n`;
+      }
+    }
+
+    // Fetch exam schedules
+    const { data: examData } = await supabase
+      .from('exam_schedules')
+      .select('*')
+      .gte('exam_date', new Date().toISOString().split('T')[0])
+      .order('exam_date', { ascending: true })
+      .limit(20);
+
+    if (examData && examData.length > 0) {
+      dynamicContext += '\nUPCOMING EXAMS:\n';
+      for (const e of examData) {
+        dynamicContext += `- ${e.exam_name} (${e.department}): ${e.subject_name} (${e.subject_code}) on ${e.exam_date} from ${e.start_time} to ${e.end_time} at ${e.venue || 'TBD'}\n`;
+      }
+    }
+
+    // Fetch campus locations
+    const { data: locationData } = await supabase
+      .from('campus_locations')
+      .select('*')
+      .eq('is_active', true)
+      .limit(50);
+
+    if (locationData && locationData.length > 0) {
+      dynamicContext += '\nCAMPUS LOCATIONS:\n';
+      for (const loc of locationData) {
+        const room = loc.room_number ? ` (Room ${loc.room_number})` : '';
+        dynamicContext += `- ${loc.name}: ${loc.building}, Floor ${loc.floor}${room} - ${loc.description || loc.location_type}. Contact: ${loc.contact_person || 'N/A'} (${loc.contact_phone || 'N/A'})\n`;
+      }
+    }
+
+    // Fetch active notices
+    const { data: noticeData } = await supabase
+      .from('notices')
+      .select('*')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (noticeData && noticeData.length > 0) {
+      dynamicContext += '\nRECENT NOTICES:\n';
+      for (const n of noticeData) {
+        dynamicContext += `- ${n.title}: ${n.content.substring(0, 100)}...\n`;
+      }
+    }
+
+    // Fetch upcoming events
+    const { data: eventData } = await supabase
+      .from('events')
+      .select('*')
+      .eq('is_active', true)
+      .gte('event_date', new Date().toISOString().split('T')[0])
+      .order('event_date', { ascending: true })
+      .limit(10);
+
+    if (eventData && eventData.length > 0) {
+      dynamicContext += '\nUPCOMING EVENTS:\n';
+      for (const ev of eventData) {
+        dynamicContext += `- ${ev.title} on ${ev.event_date} at ${ev.venue || 'TBD'}: ${ev.description || ''}\n`;
+      }
+    }
+
+  } catch (error) {
+    console.error('Error fetching dynamic context:', error);
+  }
+
+  return dynamicContext;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -163,18 +157,26 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
+    // Create supabase client for fetching dynamic data
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Fetch dynamic context from database
+    const dynamicContext = await fetchDynamicContext(supabase);
+
     const systemPrompt = `${collegeContext}
+${dynamicContext}
 
 ${rolePrompts[role] || rolePrompts.visitor}
 
 IMPORTANT INSTRUCTIONS:
-1. Always answer based on the college data provided above.
-2. Be helpful, accurate, and concise.
-3. If asked about something not in the data, politely say you don't have that specific information and suggest contacting the college directly.
-4. Format responses nicely with bullet points when listing multiple items.
-5. Include relevant contact information when appropriate.
-6. Keep responses friendly and professional.
-7. If the user greets you, greet them back and ask how you can help them.`;
+1. Answer based on both static college data AND dynamic data from database above.
+2. When asked about faculty, locations, exams, events - use the DYNAMIC DATA section.
+3. Be helpful, accurate, and concise.
+4. If asked about something not in the data, suggest contacting the college.
+5. Format responses nicely with bullet points when listing multiple items.
+6. If the user wants to connect with a faculty member for a live chat, tell them to click the "Connect with Faculty" button that will appear.`;
 
     const messages = [
       { role: "system", content: systemPrompt },
@@ -225,9 +227,16 @@ IMPORTANT INSTRUCTIONS:
     const data = await response.json();
     const aiResponse = data.choices?.[0]?.message?.content || "I'm sorry, I couldn't generate a response. Please try again.";
 
+    // Check if user wants live chat with faculty
+    const wantsLiveChat = message.toLowerCase().includes('connect') && 
+      (message.toLowerCase().includes('faculty') || message.toLowerCase().includes('teacher') || message.toLowerCase().includes('professor'));
+
     console.log("AI Response received successfully");
 
-    return new Response(JSON.stringify({ response: aiResponse }), {
+    return new Response(JSON.stringify({ 
+      response: aiResponse,
+      suggestLiveChat: wantsLiveChat
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
