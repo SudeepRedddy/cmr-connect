@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      campus_locations: {
+        Row: {
+          building: string
+          capacity: number | null
+          contact_person: string | null
+          contact_phone: string | null
+          created_at: string
+          description: string | null
+          facilities: string[] | null
+          floor: number
+          id: string
+          is_active: boolean | null
+          location_type: string
+          name: string
+          room_number: string | null
+        }
+        Insert: {
+          building: string
+          capacity?: number | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          description?: string | null
+          facilities?: string[] | null
+          floor?: number
+          id?: string
+          is_active?: boolean | null
+          location_type: string
+          name: string
+          room_number?: string | null
+        }
+        Update: {
+          building?: string
+          capacity?: number | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          description?: string | null
+          facilities?: string[] | null
+          floor?: number
+          id?: string
+          is_active?: boolean | null
+          location_type?: string
+          name?: string
+          room_number?: string | null
+        }
+        Relationships: []
+      }
       chatbot_analytics: {
         Row: {
           created_at: string | null
@@ -83,6 +131,54 @@ export type Database = {
         }
         Relationships: []
       }
+      exam_schedules: {
+        Row: {
+          created_at: string
+          department: string
+          end_time: string
+          exam_date: string
+          exam_name: string
+          exam_type: string
+          id: string
+          semester: number
+          start_time: string
+          subject_code: string
+          subject_name: string
+          venue: string | null
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          department: string
+          end_time: string
+          exam_date: string
+          exam_name: string
+          exam_type?: string
+          id?: string
+          semester: number
+          start_time: string
+          subject_code: string
+          subject_name: string
+          venue?: string | null
+          year: number
+        }
+        Update: {
+          created_at?: string
+          department?: string
+          end_time?: string
+          exam_date?: string
+          exam_name?: string
+          exam_type?: string
+          id?: string
+          semester?: number
+          start_time?: string
+          subject_code?: string
+          subject_name?: string
+          venue?: string | null
+          year?: number
+        }
+        Relationships: []
+      }
       faculty: {
         Row: {
           created_at: string | null
@@ -119,6 +215,77 @@ export type Database = {
           qualifications?: string | null
           specialization?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      live_chat_messages: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          sender_id: string
+          sender_role: string
+          session_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          sender_id: string
+          sender_role: string
+          session_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          sender_id?: string
+          sender_role?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_chat_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "live_chat_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_chat_sessions: {
+        Row: {
+          accepted_at: string | null
+          closed_at: string | null
+          created_at: string
+          department: string | null
+          faculty_id: string | null
+          id: string
+          status: string
+          student_id: string
+          topic: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          closed_at?: string | null
+          created_at?: string
+          department?: string | null
+          faculty_id?: string | null
+          id?: string
+          status?: string
+          student_id: string
+          topic?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          closed_at?: string | null
+          created_at?: string
+          department?: string | null
+          faculty_id?: string | null
+          id?: string
+          status?: string
+          student_id?: string
+          topic?: string | null
         }
         Relationships: []
       }
