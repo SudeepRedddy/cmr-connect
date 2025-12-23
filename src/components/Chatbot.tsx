@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Bot, Loader2, Mic, MicOff, GraduationCap, Users } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { MessageCircle, X, Send, Bot, Loader2, Mic, MicOff, GraduationCap, Users, Volume2, VolumeX, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import LiveChatModal from './LiveChatModal';
 
 // Web Speech API type declarations
 interface SpeechRecognitionEvent extends Event {
@@ -51,35 +52,84 @@ type Message = {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  showLiveChatButton?: boolean;
 };
 
 type UserRole = 'student' | 'faculty' | 'visitor';
 
 interface ChatbotProps {
   userRole?: UserRole;
+  userId?: string;
 }
 
-const Chatbot = ({ userRole = 'visitor' }: ChatbotProps) => {
+const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(true);
+  const [showLiveChatModal, setShowLiveChatModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const synthRef = useRef<SpeechSynthesis | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Initialize speech synthesis
+  useEffect(() => {
+    if ('speechSynthesis' in window) {
+      synthRef.current = window.speechSynthesis;
+    }
+  }, []);
+
+  const speakText = useCallback((text: string) => {
+    if (!synthRef.current || !ttsEnabled) return;
+    
+    // Cancel any ongoing speech
+    synthRef.current.cancel();
+    
+    // Clean text for better speech
+    const cleanText = text
+      .replace(/[*#]/g, '')
+      .replace(/\n+/g, '. ')
+      .replace(/[-•]/g, '')
+      .substring(0, 1000); // Limit length
+    
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = 'en-IN';
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    
+    synthRef.current.speak(utterance);
+  }, [ttsEnabled]);
+
+  const stopSpeaking = useCallback(() => {
+    if (synthRef.current) {
+      synthRef.current.cancel();
+      setIsSpeaking(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (isOpen && messages.length === 0) {
       const welcomeMessages: Record<UserRole, string> = {
-        student: "Welcome back! 👋 I'm your CMRCET AI Assistant. Ask me about your courses, timetable, placements, or any academic queries!",
+        student: "Welcome back! 👋 I'm your CMRCET AI Assistant. Ask me about courses, timetable, placements, faculty, exam schedules, or request to connect with a faculty member!",
         faculty: "Welcome! 👋 I'm here to assist you with teaching resources, research info, and administrative queries about CMRCET.",
         visitor: "Welcome to CMRCET! 👋 I'm your AI Assistant. Ask me about admissions, courses, placements, campus facilities, or anything about our college!"
       };
-      setMessages([{ id: '1', role: 'assistant', content: welcomeMessages[userRole] }]);
+      const welcomeMsg = welcomeMessages[userRole];
+      setMessages([{ id: '1', role: 'assistant', content: welcomeMsg }]);
+      if (ttsEnabled) {
+        setTimeout(() => speakText(welcomeMsg), 500);
+      }
     }
-  }, [isOpen, userRole]);
+  }, [isOpen, userRole, ttsEnabled, speakText]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -107,7 +157,7 @@ const Chatbot = ({ userRole = 'visitor' }: ChatbotProps) => {
 
       recognitionRef.current.onend = () => setIsListening(false);
     }
-  }, []);
+  }, [toast]);
 
   const toggleVoice = () => {
     if (!recognitionRef.current) {
@@ -122,6 +172,17 @@ const Chatbot = ({ userRole = 'visitor' }: ChatbotProps) => {
     }
   };
 
+  const toggleTts = () => {
+    if (isSpeaking) {
+      stopSpeaking();
+    }
+    setTtsEnabled(!ttsEnabled);
+    toast({ 
+      title: ttsEnabled ? "Voice Output Disabled" : "Voice Output Enabled",
+      description: ttsEnabled ? "Responses will not be read aloud" : "Responses will be read aloud"
+    });
+  };
+
   const handleSend = async () => {
     if (!input.trim()) return;
 
@@ -130,6 +191,7 @@ const Chatbot = ({ userRole = 'visitor' }: ChatbotProps) => {
     const userInput = input;
     setInput('');
     setIsTyping(true);
+    stopSpeaking();
 
     try {
       const conversationHistory = messages.map(msg => ({ role: msg.role, content: msg.content }));
@@ -139,21 +201,41 @@ const Chatbot = ({ userRole = 'visitor' }: ChatbotProps) => {
 
       if (error || data?.error) throw new Error(data?.error || error?.message);
 
-      const assistantMessage: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: data.response };
+      const assistantMessage: Message = { 
+        id: (Date.now() + 1).toString(), 
+        role: 'assistant', 
+        content: data.response,
+        showLiveChatButton: data.suggestLiveChat && userRole === 'student'
+      };
       setMessages((prev) => [...prev, assistantMessage]);
+
+      // Speak the response
+      if (ttsEnabled) {
+        speakText(data.response);
+      }
 
       // Log analytics
       await supabase.from('chatbot_analytics').insert({ user_role: userRole, question: userInput, response: data.response });
     } catch (error) {
       console.error('Chatbot error:', error);
+      const errorMsg = "I apologize, but I'm having trouble connecting. Please try again or contact +91-40-64635858.";
       setMessages((prev) => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: "I apologize, but I'm having trouble connecting. Please try again or contact +91-40-64635858."
+        content: errorMsg
       }]);
     } finally {
       setIsTyping(false);
     }
+  };
+
+  const handleRequestLiveChat = () => {
+    if (!userId) {
+      toast({ title: "Login Required", description: "Please login as a student to connect with faculty", variant: "destructive" });
+      navigate('/login?type=student');
+      return;
+    }
+    setShowLiveChatModal(true);
   };
 
   return (
@@ -179,17 +261,41 @@ const Chatbot = ({ userRole = 'visitor' }: ChatbotProps) => {
                 </p>
               </div>
             </div>
-            <button onClick={() => setIsOpen(false)} className="w-8 h-8 rounded-full hover:bg-primary-foreground/10 flex items-center justify-center">
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button 
+                onClick={toggleTts} 
+                className={`w-8 h-8 rounded-full hover:bg-primary-foreground/10 flex items-center justify-center ${isSpeaking ? 'bg-primary-foreground/20' : ''}`}
+                title={ttsEnabled ? "Disable voice output" : "Enable voice output"}
+              >
+                {ttsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              </button>
+              <button onClick={() => { stopSpeaking(); setIsOpen(false); }} className="w-8 h-8 rounded-full hover:bg-primary-foreground/10 flex items-center justify-center">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.map((message) => (
-              <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${message.role === 'user' ? 'bg-primary text-primary-foreground rounded-br-sm' : 'bg-muted text-foreground rounded-bl-sm'}`}>
-                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              <div key={message.id} className="space-y-2">
+                <div className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${message.role === 'user' ? 'bg-primary text-primary-foreground rounded-br-sm' : 'bg-muted text-foreground rounded-bl-sm'}`}>
+                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  </div>
                 </div>
+                {message.showLiveChatButton && (
+                  <div className="flex justify-start pl-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={handleRequestLiveChat}
+                      className="text-xs"
+                    >
+                      <UserPlus className="w-3 h-3 mr-1" />
+                      Connect with Faculty
+                    </Button>
+                  </div>
+                )}
               </div>
             ))}
             {isTyping && (
@@ -217,6 +323,20 @@ const Chatbot = ({ userRole = 'visitor' }: ChatbotProps) => {
             </div>
           )}
 
+          {userRole === 'student' && (
+            <div className="px-4 py-2 border-t border-border bg-muted/50">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="w-full text-xs"
+                onClick={handleRequestLiveChat}
+              >
+                <UserPlus className="w-3 h-3 mr-1" />
+                Request Live Chat with Faculty
+              </Button>
+            </div>
+          )}
+
           <div className="p-4 border-t border-border">
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="icon" onClick={toggleVoice} className={isListening ? 'bg-destructive/10 text-destructive' : ''}>
@@ -237,6 +357,14 @@ const Chatbot = ({ userRole = 'visitor' }: ChatbotProps) => {
             </div>
           </div>
         </div>
+      )}
+
+      {showLiveChatModal && userId && (
+        <LiveChatModal 
+          isOpen={showLiveChatModal}
+          onClose={() => setShowLiveChatModal(false)}
+          studentId={userId}
+        />
       )}
     </>
   );
