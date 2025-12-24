@@ -42,36 +42,57 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    let mounted = true;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
+        if (!mounted) return;
+        
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          const role = await fetchUserRole(session.user.id);
-          setUserRole(role);
+          // Use setTimeout to avoid deadlock
+          setTimeout(() => {
+            if (mounted) {
+              fetchUserRole(session.user.id).then(role => {
+                if (mounted) {
+                  setUserRole(role);
+                  setLoading(false);
+                }
+              });
+            }
+          }, 0);
         } else {
           setUserRole(null);
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
-    const initSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+    // Check initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
+      
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        const role = await fetchUserRole(session.user.id);
-        setUserRole(role);
+        fetchUserRole(session.user.id).then(role => {
+          if (mounted) {
+            setUserRole(role);
+            setLoading(false);
+          }
+        });
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
     };
-
-    initSession();
-
-    return () => subscription.unsubscribe();
   }, []);
 
   const signIn = async (email: string, password: string) => {
