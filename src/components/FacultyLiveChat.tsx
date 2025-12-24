@@ -10,6 +10,7 @@ import { MessageCircle, Send, Check, X, User, Clock } from 'lucide-react';
 interface ChatSession {
   id: string;
   student_id: string;
+  faculty_id: string | null;
   status: string;
   topic: string | null;
   department: string | null;
