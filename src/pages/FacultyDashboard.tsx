@@ -38,7 +38,10 @@ const FacultyDashboard = () => {
   const [profileData, setProfileData] = useState<{ full_name: string; email: string } | null>(null);
 
   useEffect(() => {
-    if (!loading && (!user || userRole !== 'faculty')) {
+    // Only redirect if fully loaded and user doesn't have faculty role
+    if (!loading && !user) {
+      navigate('/login?type=faculty');
+    } else if (!loading && user && userRole && userRole !== 'faculty') {
       navigate('/login?type=faculty');
     }
   }, [user, userRole, loading, navigate]);
