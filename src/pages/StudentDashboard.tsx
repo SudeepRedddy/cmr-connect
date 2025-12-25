@@ -325,7 +325,7 @@ const StudentDashboard = () => {
       </main>
 
       {/* Chatbot */}
-      <Chatbot userRole="student" />
+      <Chatbot userRole="student" userId={user?.id} />
     </div>
   );
 };
