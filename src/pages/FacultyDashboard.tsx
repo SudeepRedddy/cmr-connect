@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import Chatbot from '@/components/Chatbot';
+import FacultyLiveChat from '@/components/FacultyLiveChat';
 import { 
   Users, BookOpen, Calendar, Bell, User, LogOut, 
   Briefcase, FileText, GraduationCap, Clock
@@ -32,11 +33,15 @@ const FacultyDashboard = () => {
   const { user, userRole, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const [facultyData, setFacultyData] = useState<FacultyData | null>(null);
+  const [facultyId, setFacultyId] = useState<string | null>(null);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [profileData, setProfileData] = useState<{ full_name: string; email: string } | null>(null);
 
   useEffect(() => {
-    if (!loading && (!user || userRole !== 'faculty')) {
+    // Only redirect if fully loaded and user doesn't have faculty role
+    if (!loading && !user) {
+      navigate('/login?type=faculty');
+    } else if (!loading && user && userRole && userRole !== 'faculty') {
       navigate('/login?type=faculty');
     }
   }, [user, userRole, loading, navigate]);
@@ -56,7 +61,10 @@ const FacultyDashboard = () => {
       .eq('user_id', user?.id)
       .single();
     
-    if (data) setFacultyData(data);
+    if (data) {
+      setFacultyData(data);
+      setFacultyId(data.id);
+    }
   };
 
   const fetchProfile = async () => {
@@ -287,6 +295,16 @@ const FacultyDashboard = () => {
               )}
             </CardContent>
           </Card>
+
+          {/* Live Chat */}
+          {facultyId && facultyData && (
+            <Card className="lg:col-span-3">
+              <FacultyLiveChat 
+                facultyId={facultyId} 
+                facultyDepartment={facultyData.department} 
+              />
+            </Card>
+          )}
         </div>
       </main>
 

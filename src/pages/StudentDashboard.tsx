@@ -45,7 +45,10 @@ const StudentDashboard = () => {
   const [profileData, setProfileData] = useState<{ full_name: string; email: string } | null>(null);
 
   useEffect(() => {
-    if (!loading && (!user || userRole !== 'student')) {
+    // Only redirect if fully loaded and user doesn't have student role
+    if (!loading && !user) {
+      navigate('/login?type=student');
+    } else if (!loading && user && userRole && userRole !== 'student') {
       navigate('/login?type=student');
     }
   }, [user, userRole, loading, navigate]);
@@ -322,7 +325,7 @@ const StudentDashboard = () => {
       </main>
 
       {/* Chatbot */}
-      <Chatbot userRole="student" />
+      <Chatbot userRole="student" userId={user?.id} />
     </div>
   );
 };
