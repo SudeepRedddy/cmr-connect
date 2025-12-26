@@ -27,11 +27,11 @@ interface ChatMessage {
 }
 
 interface FacultyLiveChatProps {
-  facultyId: string;
+  facultyUserId: string;
   facultyDepartment: string;
 }
 
-const FacultyLiveChat = ({ facultyId, facultyDepartment }: FacultyLiveChatProps) => {
+const FacultyLiveChat = ({ facultyUserId, facultyDepartment }: FacultyLiveChatProps) => {
   const [pendingSessions, setPendingSessions] = useState<ChatSession[]>([]);
   const [activeSession, setActiveSession] = useState<ChatSession | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -161,14 +161,14 @@ const FacultyLiveChat = ({ facultyId, facultyDepartment }: FacultyLiveChatProps)
         .from('live_chat_sessions')
         .update({
           status: 'active',
-          faculty_id: facultyId,
+          faculty_id: facultyUserId,
           accepted_at: new Date().toISOString()
         })
         .eq('id', session.id);
 
       if (error) throw error;
 
-      setActiveSession({ ...session, status: 'active', faculty_id: facultyId, accepted_at: new Date().toISOString() });
+      setActiveSession({ ...session, status: 'active', faculty_id: facultyUserId, accepted_at: new Date().toISOString() });
       setPendingSessions(prev => prev.filter(s => s.id !== session.id));
       toast({ title: "Chat Started", description: "You are now connected with the student" });
     } catch (error) {
@@ -201,7 +201,7 @@ const FacultyLiveChat = ({ facultyId, facultyDepartment }: FacultyLiveChatProps)
         .from('live_chat_messages')
         .insert({
           session_id: activeSession.id,
-          sender_id: facultyId,
+          sender_id: facultyUserId,
           sender_role: 'faculty',
           message: messageText
         });

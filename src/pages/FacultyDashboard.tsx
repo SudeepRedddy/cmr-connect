@@ -297,10 +297,10 @@ const FacultyDashboard = () => {
           </Card>
 
           {/* Live Chat */}
-          {facultyId && facultyData && (
+          {user && facultyData && (
             <Card className="lg:col-span-3">
               <FacultyLiveChat 
-                facultyId={facultyId} 
+                facultyUserId={user.id} 
                 facultyDepartment={facultyData.department} 
               />
             </Card>
