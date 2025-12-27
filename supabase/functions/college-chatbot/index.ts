@@ -42,6 +42,72 @@ CONTACT:
 - Website: https://cmrcet.ac.in
 `;
 
+// CMRCET related images - curated from official sources
+const cmrcetImages: Record<string, string[]> = {
+  campus: [
+    'https://cmrcet.ac.in/wp-content/uploads/2023/12/campus-1.jpg',
+    'https://cmrcet.ac.in/wp-content/uploads/2023/12/campus-2.jpg',
+  ],
+  placements: [
+    'https://cmrcet.ac.in/wp-content/uploads/2024/01/placements-banner.jpg',
+  ],
+  events: [
+    'https://cmrcet.ac.in/wp-content/uploads/2023/12/events-1.jpg',
+  ],
+  labs: [
+    'https://cmrcet.ac.in/wp-content/uploads/2023/12/labs-1.jpg',
+  ],
+  library: [
+    'https://cmrcet.ac.in/wp-content/uploads/2023/12/library-1.jpg',
+  ],
+  sports: [
+    'https://cmrcet.ac.in/wp-content/uploads/2023/12/sports-1.jpg',
+  ],
+  general: [
+    '/cmr.png',
+  ]
+};
+
+// Function to determine which images to include based on the query
+function getRelevantImages(message: string): string[] {
+  const lowerMessage = message.toLowerCase();
+  const images: string[] = [];
+  
+  if (lowerMessage.includes('campus') || lowerMessage.includes('building') || lowerMessage.includes('infrastructure')) {
+    images.push(...cmrcetImages.campus);
+  }
+  if (lowerMessage.includes('placement') || lowerMessage.includes('job') || lowerMessage.includes('recruit') || lowerMessage.includes('package')) {
+    images.push(...cmrcetImages.placements);
+  }
+  if (lowerMessage.includes('event') || lowerMessage.includes('fest') || lowerMessage.includes('celebration')) {
+    images.push(...cmrcetImages.events);
+  }
+  if (lowerMessage.includes('lab') || lowerMessage.includes('practical') || lowerMessage.includes('equipment')) {
+    images.push(...cmrcetImages.labs);
+  }
+  if (lowerMessage.includes('library') || lowerMessage.includes('book') || lowerMessage.includes('reading')) {
+    images.push(...cmrcetImages.library);
+  }
+  if (lowerMessage.includes('sports') || lowerMessage.includes('games') || lowerMessage.includes('ground')) {
+    images.push(...cmrcetImages.sports);
+  }
+  
+  // For general queries about college, show the logo
+  if (images.length === 0 && (
+    lowerMessage.includes('about') || 
+    lowerMessage.includes('cmrcet') || 
+    lowerMessage.includes('college') ||
+    lowerMessage.includes('overview') ||
+    lowerMessage.includes('hi') ||
+    lowerMessage.includes('hello')
+  )) {
+    images.push(...cmrcetImages.general);
+  }
+  
+  // Limit to max 2 images per response
+  return images.slice(0, 2);
+}
+
 const rolePrompts: Record<string, string> = {
   student: `You are speaking to a student. Focus on courses, placements, campus life, facilities. Be friendly and peer-like.`,
   faculty: `You are speaking to a faculty member. Focus on academic resources, research, LMS portals. Be professional.`,
@@ -231,11 +297,15 @@ IMPORTANT INSTRUCTIONS:
     const wantsLiveChat = message.toLowerCase().includes('connect') && 
       (message.toLowerCase().includes('faculty') || message.toLowerCase().includes('teacher') || message.toLowerCase().includes('professor'));
 
-    console.log("AI Response received successfully");
+    // Get relevant images based on the query
+    const relevantImages = getRelevantImages(message);
+
+    console.log("AI Response received successfully, images:", relevantImages.length);
 
     return new Response(JSON.stringify({ 
       response: aiResponse,
-      suggestLiveChat: wantsLiveChat
+      suggestLiveChat: wantsLiveChat,
+      images: relevantImages
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
