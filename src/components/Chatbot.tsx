@@ -55,6 +55,7 @@ type Message = {
   role: 'user' | 'assistant';
   content: string;
   showLiveChatButton?: boolean;
+  images?: string[];
 };
 
 type UserRole = 'student' | 'faculty' | 'visitor';
@@ -71,7 +72,7 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
   const [isTyping, setIsTyping] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [ttsEnabled, setTtsEnabled] = useState(true);
+  const [ttsEnabled, setTtsEnabled] = useState(false);
   const [showLiveChatModal, setShowLiveChatModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -92,17 +93,35 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
     // Cancel any ongoing speech
     synthRef.current.cancel();
     
-    // Clean text for better speech
+    // Clean text for better speech - remove markdown and special chars
     const cleanText = text
-      .replace(/[*#]/g, '')
+      .replace(/[*#_`]/g, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Remove markdown links, keep text
+      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '') // Remove image markdown
       .replace(/\n+/g, '. ')
       .replace(/[-•]/g, '')
-      .substring(0, 1000); // Limit length
+      .replace(/\s+/g, ' ')
+      .trim()
+      .substring(0, 1500); // Limit length
     
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.lang = 'en-IN';
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
+    utterance.rate = 0.95; // Slightly slower for natural feel
+    utterance.pitch = 1.05; // Slightly higher for warmth
+    utterance.volume = 1.0;
+    
+    // Try to get a more natural voice
+    const voices = synthRef.current.getVoices();
+    const preferredVoice = voices.find(v => 
+      v.name.includes('Google') || 
+      v.name.includes('Natural') || 
+      v.name.includes('Premium') ||
+      (v.lang.includes('en') && v.name.includes('Female'))
+    ) || voices.find(v => v.lang.includes('en-IN')) || voices[0];
+    
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+    }
     
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => setIsSpeaking(false);
@@ -207,7 +226,8 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
         id: (Date.now() + 1).toString(), 
         role: 'assistant', 
         content: data.response,
-        showLiveChatButton: data.suggestLiveChat && userRole === 'student'
+        showLiveChatButton: data.suggestLiveChat && userRole === 'student',
+        images: data.images
       };
       setMessages((prev) => [...prev, assistantMessage]);
 
@@ -279,16 +299,33 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
 
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.map((message) => (
-              <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div key={message.id} className={`flex flex-col ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
                 <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${message.role === 'user' ? 'bg-primary text-primary-foreground rounded-br-sm' : 'bg-muted text-foreground rounded-bl-sm'}`}>
                   <div className="text-sm whitespace-pre-wrap prose prose-sm max-w-none">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
                       {message.content}
                     </ReactMarkdown>
                   </div>
+                  {/* Display images if present */}
+                  {message.images && message.images.length > 0 && (
+                    <div className="mt-3 grid gap-2">
+                      {message.images.map((img, idx) => (
+                        <img 
+                          key={idx}
+                          src={img}
+                          alt={`CMRCET related image ${idx + 1}`}
+                          className="rounded-lg w-full max-h-40 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => window.open(img, '_blank')}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {message.showLiveChatButton && (
-                  <div className="flex justify-start pl-2">
+                  <div className="flex justify-start pl-2 mt-2">
                     <Button 
                       size="sm" 
                       variant="outline" 
