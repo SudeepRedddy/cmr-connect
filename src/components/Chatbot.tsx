@@ -80,12 +80,72 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // ElevenLabs TTS function - direct call (always speaks)
+  // Browser TTS fallback function
+  const speakWithBrowserTTS = useCallback((text: string) => {
+    if (!('speechSynthesis' in window)) {
+      toast({
+        title: "Voice Not Supported",
+        description: "Your browser doesn't support text-to-speech",
+        variant: "destructive"
+      });
+      setIsSpeaking(false);
+      setCurrentPlayingId(null);
+      return;
+    }
+
+    const synth = window.speechSynthesis;
+    synth.cancel();
+
+    // Clean text for better speech
+    const cleanText = text
+      .replace(/[*#_`]/g, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '')
+      .replace(/\n+/g, '. ')
+      .replace(/[-•]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .substring(0, 1500);
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = 'en-IN';
+    utterance.rate = 0.95;
+    utterance.pitch = 1.05;
+    utterance.volume = 1.0;
+
+    const voices = synth.getVoices();
+    const preferredVoice = voices.find(v => 
+      v.name.includes('Google') || 
+      v.name.includes('Natural') || 
+      v.name.includes('Premium') ||
+      (v.lang.includes('en') && v.name.includes('Female'))
+    ) || voices.find(v => v.lang.includes('en')) || voices[0];
+
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+    }
+
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      setCurrentPlayingId(null);
+    };
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+      setCurrentPlayingId(null);
+    };
+
+    synth.speak(utterance);
+  }, [toast]);
+
+  // TTS function - tries ElevenLabs first, falls back to browser TTS
   const speakTextDirect = useCallback(async (text: string) => {
     // Stop any ongoing audio
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
+    }
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
     }
     
     setIsSpeaking(true);
@@ -105,7 +165,9 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
       );
 
       if (!response.ok) {
-        throw new Error(`TTS request failed: ${response.status}`);
+        console.warn('ElevenLabs TTS failed, falling back to browser TTS');
+        speakWithBrowserTTS(text);
+        return;
       }
 
       const audioBlob = await response.blob();
@@ -130,16 +192,10 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
       
       await audio.play();
     } catch (error) {
-      console.error('ElevenLabs TTS error:', error);
-      setIsSpeaking(false);
-      setCurrentPlayingId(null);
-      toast({
-        title: "Voice Error",
-        description: "Could not play audio response",
-        variant: "destructive"
-      });
+      console.error('ElevenLabs TTS error, using browser fallback:', error);
+      speakWithBrowserTTS(text);
     }
-  }, [toast]);
+  }, [speakWithBrowserTTS]);
 
   const stopSpeaking = useCallback(() => {
     if (audioRef.current) {
