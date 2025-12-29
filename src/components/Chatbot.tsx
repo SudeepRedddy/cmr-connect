@@ -72,7 +72,7 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
   const [isTyping, setIsTyping] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [ttsEnabled, setTtsEnabled] = useState(false); // Muted by default
+  const [currentPlayingId, setCurrentPlayingId] = useState<string | null>(null);
   const [showLiveChatModal, setShowLiveChatModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -80,10 +80,8 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // ElevenLabs TTS function
-  const speakText = useCallback(async (text: string) => {
-    if (!ttsEnabled) return;
-    
+  // ElevenLabs TTS function - direct call (always speaks)
+  const speakTextDirect = useCallback(async (text: string) => {
     // Stop any ongoing audio
     if (audioRef.current) {
       audioRef.current.pause();
@@ -93,7 +91,6 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
     setIsSpeaking(true);
 
     try {
-      // Call ElevenLabs TTS edge function using fetch for binary data
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
         {
@@ -119,12 +116,14 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
       
       audio.onended = () => {
         setIsSpeaking(false);
+        setCurrentPlayingId(null);
         URL.revokeObjectURL(audioUrl);
         audioRef.current = null;
       };
       
       audio.onerror = () => {
         setIsSpeaking(false);
+        setCurrentPlayingId(null);
         URL.revokeObjectURL(audioUrl);
         audioRef.current = null;
       };
@@ -133,8 +132,14 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
     } catch (error) {
       console.error('ElevenLabs TTS error:', error);
       setIsSpeaking(false);
+      setCurrentPlayingId(null);
+      toast({
+        title: "Voice Error",
+        description: "Could not play audio response",
+        variant: "destructive"
+      });
     }
-  }, [ttsEnabled]);
+  }, [toast]);
 
   const stopSpeaking = useCallback(() => {
     if (audioRef.current) {
@@ -153,11 +158,8 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
       };
       const welcomeMsg = welcomeMessages[userRole];
       setMessages([{ id: '1', role: 'assistant', content: welcomeMsg }]);
-      if (ttsEnabled) {
-        setTimeout(() => speakText(welcomeMsg), 500);
-      }
     }
-  }, [isOpen, userRole, ttsEnabled, speakText]);
+  }, [isOpen, userRole]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -200,17 +202,6 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
     }
   };
 
-  const toggleTts = () => {
-    if (isSpeaking) {
-      stopSpeaking();
-    }
-    setTtsEnabled(!ttsEnabled);
-    toast({ 
-      title: ttsEnabled ? "Voice Output Disabled" : "Voice Output Enabled",
-      description: ttsEnabled ? "Responses will not be read aloud" : "Responses will be read aloud"
-    });
-  };
-
   const handleSend = async () => {
     if (!input.trim()) return;
 
@@ -237,11 +228,6 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
         images: data.images
       };
       setMessages((prev) => [...prev, assistantMessage]);
-
-      // Speak the response
-      if (ttsEnabled) {
-        speakText(data.response);
-      }
 
       // Log analytics
       await supabase.from('chatbot_analytics').insert({ user_role: userRole, question: userInput, response: data.response });
@@ -291,13 +277,6 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
               </div>
             </div>
             <div className="flex items-center gap-1">
-              <button 
-                onClick={toggleTts} 
-                className={`w-8 h-8 rounded-full hover:bg-primary-foreground/10 flex items-center justify-center ${isSpeaking ? 'bg-primary-foreground/20' : ''}`}
-                title={ttsEnabled ? "Disable voice output" : "Enable voice output"}
-              >
-                {ttsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-              </button>
               <button onClick={() => { stopSpeaking(); setIsOpen(false); }} className="w-8 h-8 rounded-full hover:bg-primary-foreground/10 flex items-center justify-center">
                 <X className="w-5 h-5" />
               </button>
@@ -331,6 +310,30 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
                     </div>
                   )}
                 </div>
+                {/* Speaker button for assistant messages */}
+                {message.role === 'assistant' && (
+                  <button
+                    onClick={() => {
+                      if (isSpeaking && currentPlayingId === message.id) {
+                        stopSpeaking();
+                        setCurrentPlayingId(null);
+                      } else {
+                        setCurrentPlayingId(message.id);
+                        speakTextDirect(message.content);
+                      }
+                    }}
+                    className={`mt-1 ml-1 p-1.5 rounded-full hover:bg-muted transition-colors ${
+                      isSpeaking && currentPlayingId === message.id ? 'bg-primary/10 text-primary' : 'text-muted-foreground'
+                    }`}
+                    title={isSpeaking && currentPlayingId === message.id ? "Stop speaking" : "Listen to this response"}
+                  >
+                    {isSpeaking && currentPlayingId === message.id ? (
+                      <VolumeX className="w-4 h-4" />
+                    ) : (
+                      <Volume2 className="w-4 h-4" />
+                    )}
+                  </button>
+                )}
                 {message.showLiveChatButton && (
                   <div className="flex justify-start pl-2 mt-2">
                     <Button 
