@@ -72,67 +72,74 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
   const [isTyping, setIsTyping] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [ttsEnabled, setTtsEnabled] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(false); // Muted by default
   const [showLiveChatModal, setShowLiveChatModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const synthRef = useRef<SpeechSynthesis | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Initialize speech synthesis
-  useEffect(() => {
-    if ('speechSynthesis' in window) {
-      synthRef.current = window.speechSynthesis;
+  // ElevenLabs TTS function
+  const speakText = useCallback(async (text: string) => {
+    if (!ttsEnabled) return;
+    
+    // Stop any ongoing audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
     }
-  }, []);
+    
+    setIsSpeaking(true);
 
-  const speakText = useCallback((text: string) => {
-    if (!synthRef.current || !ttsEnabled) return;
-    
-    // Cancel any ongoing speech
-    synthRef.current.cancel();
-    
-    // Clean text for better speech - remove markdown and special chars
-    const cleanText = text
-      .replace(/[*#_`]/g, '')
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Remove markdown links, keep text
-      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '') // Remove image markdown
-      .replace(/\n+/g, '. ')
-      .replace(/[-•]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .substring(0, 1500); // Limit length
-    
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.lang = 'en-IN';
-    utterance.rate = 0.95; // Slightly slower for natural feel
-    utterance.pitch = 1.05; // Slightly higher for warmth
-    utterance.volume = 1.0;
-    
-    // Try to get a more natural voice
-    const voices = synthRef.current.getVoices();
-    const preferredVoice = voices.find(v => 
-      v.name.includes('Google') || 
-      v.name.includes('Natural') || 
-      v.name.includes('Premium') ||
-      (v.lang.includes('en') && v.name.includes('Female'))
-    ) || voices.find(v => v.lang.includes('en-IN')) || voices[0];
-    
-    if (preferredVoice) {
-      utterance.voice = preferredVoice;
+    try {
+      // Call ElevenLabs TTS edge function using fetch for binary data
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ text }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`TTS request failed: ${response.status}`);
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+      
+      audio.onended = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+        audioRef.current = null;
+      };
+      
+      audio.onerror = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+        audioRef.current = null;
+      };
+      
+      await audio.play();
+    } catch (error) {
+      console.error('ElevenLabs TTS error:', error);
+      setIsSpeaking(false);
     }
-    
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-    
-    synthRef.current.speak(utterance);
   }, [ttsEnabled]);
 
   const stopSpeaking = useCallback(() => {
-    if (synthRef.current) {
-      synthRef.current.cancel();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
       setIsSpeaking(false);
     }
   }, []);
