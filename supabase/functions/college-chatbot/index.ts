@@ -42,29 +42,44 @@ CONTACT:
 - Website: https://cmrcet.ac.in
 `;
 
-// CMRCET related images - curated from official sources
+// CMRCET related images - real images from official website
 const cmrcetImages: Record<string, string[]> = {
   campus: [
-    'https://cmrcet.ac.in/wp-content/uploads/2023/12/campus-1.jpg',
-    'https://cmrcet.ac.in/wp-content/uploads/2023/12/campus-2.jpg',
+    'https://cmrcet.ac.in/wp-content/uploads/2025/07/2023-24-campus.png',
+    'https://cmrcet.ac.in/wp-content/uploads/2025/12/WhatsApp-Image-2025-12-03-at-22.42.01.jpeg',
   ],
   placements: [
-    'https://cmrcet.ac.in/wp-content/uploads/2024/01/placements-banner.jpg',
+    'https://cmrcet.ac.in/wp-content/uploads/2025/07/topcompani.png',
+    'https://cmrcet.ac.in/wp-content/uploads/2025/07/comp.png',
   ],
   events: [
-    'https://cmrcet.ac.in/wp-content/uploads/2023/12/events-1.jpg',
+    'https://cmrcet.ac.in/wp-content/uploads/2025/07/cmrthinkfest-1-e1765185592623.jpg',
+    'https://cmrcet.ac.in/wp-content/uploads/2025/12/WhatsApp-Image-2025-12-03-at-22.42.02-2.jpeg',
   ],
-  labs: [
-    'https://cmrcet.ac.in/wp-content/uploads/2023/12/labs-1.jpg',
+  courses: [
+    'https://cmrcet.ac.in/wp-content/uploads/2025/10/cse.png',
+    'https://cmrcet.ac.in/wp-content/uploads/2025/10/IT.png',
+    'https://cmrcet.ac.in/wp-content/uploads/2025/10/ECE.png',
   ],
-  library: [
-    'https://cmrcet.ac.in/wp-content/uploads/2023/12/library-1.jpg',
+  rankings: [
+    'https://cmrcet.ac.in/wp-content/uploads/2025/10/nirf2025.png',
+    'https://cmrcet.ac.in/wp-content/uploads/2025/10/nirf_Innovation_rank_2024-scaled.png',
   ],
-  sports: [
-    'https://cmrcet.ac.in/wp-content/uploads/2023/12/sports-1.jpg',
+  research: [
+    'https://cmrcet.ac.in/wp-content/uploads/2025/10/Screenshot-2025-10-26-154113.png',
+    'https://cmrcet.ac.in/wp-content/uploads/2025/10/Screenshot-2025-10-26-154122.png',
+  ],
+  departments: [
+    'https://cmrcet.ac.in/wp-content/uploads/2025/10/cse_DS.png',
+    'https://cmrcet.ac.in/wp-content/uploads/2025/10/Mech.png',
+    'https://cmrcet.ac.in/wp-content/uploads/2025/10/EEE.png',
+  ],
+  mba: [
+    'https://cmrcet.ac.in/wp-content/uploads/2025/10/MBA.png',
   ],
   general: [
-    '/cmr.png',
+    'https://cmrcet.ac.in/wp-content/uploads/2025/07/cmcst.png',
+    'https://cmrcet.ac.in/wp-content/uploads/2025/07/sa6.png',
   ]
 };
 
@@ -73,35 +88,62 @@ function getRelevantImages(message: string): string[] {
   const lowerMessage = message.toLowerCase();
   const images: string[] = [];
   
-  if (lowerMessage.includes('campus') || lowerMessage.includes('building') || lowerMessage.includes('infrastructure')) {
+  // Campus/Infrastructure queries
+  if (lowerMessage.includes('campus') || lowerMessage.includes('building') || lowerMessage.includes('infrastructure') || lowerMessage.includes('facility') || lowerMessage.includes('facilities')) {
     images.push(...cmrcetImages.campus);
   }
-  if (lowerMessage.includes('placement') || lowerMessage.includes('job') || lowerMessage.includes('recruit') || lowerMessage.includes('package')) {
+  
+  // Placement queries
+  if (lowerMessage.includes('placement') || lowerMessage.includes('job') || lowerMessage.includes('recruit') || lowerMessage.includes('package') || lowerMessage.includes('salary') || lowerMessage.includes('company') || lowerMessage.includes('companies')) {
     images.push(...cmrcetImages.placements);
   }
-  if (lowerMessage.includes('event') || lowerMessage.includes('fest') || lowerMessage.includes('celebration')) {
+  
+  // Events/Fests queries
+  if (lowerMessage.includes('event') || lowerMessage.includes('fest') || lowerMessage.includes('celebration') || lowerMessage.includes('cultural') || lowerMessage.includes('technical')) {
     images.push(...cmrcetImages.events);
   }
-  if (lowerMessage.includes('lab') || lowerMessage.includes('practical') || lowerMessage.includes('equipment')) {
-    images.push(...cmrcetImages.labs);
-  }
-  if (lowerMessage.includes('library') || lowerMessage.includes('book') || lowerMessage.includes('reading')) {
-    images.push(...cmrcetImages.library);
-  }
-  if (lowerMessage.includes('sports') || lowerMessage.includes('games') || lowerMessage.includes('ground')) {
-    images.push(...cmrcetImages.sports);
+  
+  // Course/Program queries
+  if (lowerMessage.includes('course') || lowerMessage.includes('program') || lowerMessage.includes('btech') || lowerMessage.includes('b.tech') || lowerMessage.includes('degree')) {
+    images.push(...cmrcetImages.courses);
   }
   
-  // For general queries about college, show the logo
-  if (images.length === 0 && (
-    lowerMessage.includes('about') || 
-    lowerMessage.includes('cmrcet') || 
-    lowerMessage.includes('college') ||
-    lowerMessage.includes('overview') ||
-    lowerMessage.includes('hi') ||
-    lowerMessage.includes('hello')
-  )) {
-    images.push(...cmrcetImages.general);
+  // Rankings/Accreditation queries
+  if (lowerMessage.includes('rank') || lowerMessage.includes('nirf') || lowerMessage.includes('naac') || lowerMessage.includes('accredit') || lowerMessage.includes('rating')) {
+    images.push(...cmrcetImages.rankings);
+  }
+  
+  // Research queries
+  if (lowerMessage.includes('research') || lowerMessage.includes('project') || lowerMessage.includes('innovation') || lowerMessage.includes('lab') || lowerMessage.includes('publication')) {
+    images.push(...cmrcetImages.research);
+  }
+  
+  // Department queries
+  if (lowerMessage.includes('cse') || lowerMessage.includes('ece') || lowerMessage.includes('eee') || lowerMessage.includes('mech') || lowerMessage.includes('civil') || lowerMessage.includes('department') || lowerMessage.includes('branch')) {
+    images.push(...cmrcetImages.departments);
+  }
+  
+  // MBA queries
+  if (lowerMessage.includes('mba') || lowerMessage.includes('management') || lowerMessage.includes('business')) {
+    images.push(...cmrcetImages.mba);
+  }
+  
+  // General queries about college - always show at least something
+  if (images.length === 0) {
+    if (lowerMessage.includes('about') || 
+        lowerMessage.includes('cmrcet') || 
+        lowerMessage.includes('cmr') ||
+        lowerMessage.includes('college') ||
+        lowerMessage.includes('overview') ||
+        lowerMessage.includes('admission') ||
+        lowerMessage.includes('fee') ||
+        lowerMessage.includes('hi') ||
+        lowerMessage.includes('hello') ||
+        lowerMessage.includes('hey') ||
+        lowerMessage.includes('what') ||
+        lowerMessage.includes('tell me')) {
+      images.push(...cmrcetImages.general);
+    }
   }
   
   // Limit to max 2 images per response
