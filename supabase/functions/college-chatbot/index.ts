@@ -284,7 +284,14 @@ IMPORTANT INSTRUCTIONS:
 3. Be helpful, accurate, and concise.
 4. If asked about something not in the data, suggest contacting the college.
 5. Format responses nicely with bullet points when listing multiple items.
-6. If the user wants to connect with a faculty member for a live chat, tell them to click the "Connect with Faculty" button that will appear.`;
+6. If the user wants to connect with a faculty member for a live chat, tell them to click the "Connect with Faculty" button that will appear.
+7. IMPORTANT: At the end of EVERY response, add a section with exactly 2-3 follow-up questions the user might want to ask, formatted as:
+   ---SUGGESTIONS---
+   Question 1?
+   Question 2?
+   Question 3?
+   
+   These should be relevant to the topic just discussed and help guide the conversation.`;
 
     const messages = [
       { role: "system", content: systemPrompt },
@@ -333,7 +340,22 @@ IMPORTANT INSTRUCTIONS:
     }
 
     const data = await response.json();
-    const aiResponse = data.choices?.[0]?.message?.content || "I'm sorry, I couldn't generate a response. Please try again.";
+    let aiResponse = data.choices?.[0]?.message?.content || "I'm sorry, I couldn't generate a response. Please try again.";
+
+    // Extract suggestions from response
+    let suggestions: string[] = [];
+    if (aiResponse.includes('---SUGGESTIONS---')) {
+      const parts = aiResponse.split('---SUGGESTIONS---');
+      aiResponse = parts[0].trim();
+      if (parts[1]) {
+        suggestions = parts[1]
+          .trim()
+          .split('\n')
+          .map((s: string) => s.trim())
+          .filter((s: string) => s.length > 0 && s.endsWith('?'))
+          .slice(0, 3);
+      }
+    }
 
     // Check if user wants live chat with faculty
     const wantsLiveChat = message.toLowerCase().includes('connect') && 
@@ -342,12 +364,13 @@ IMPORTANT INSTRUCTIONS:
     // Get relevant images based on the query
     const relevantImages = getRelevantImages(message);
 
-    console.log("AI Response received successfully, images:", relevantImages.length);
+    console.log("AI Response received successfully, images:", relevantImages.length, "suggestions:", suggestions.length);
 
     return new Response(JSON.stringify({ 
       response: aiResponse,
       suggestLiveChat: wantsLiveChat,
-      images: relevantImages
+      images: relevantImages,
+      suggestions: suggestions
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
