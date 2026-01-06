@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { MessageCircle, X, Send, Bot, Loader2, Mic, MicOff, GraduationCap, Users, Volume2, VolumeX, UserPlus } from 'lucide-react';
+import { MessageCircle, X, Send, Bot, Loader2, Mic, MicOff, GraduationCap, Users, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import LiveChatModal from './LiveChatModal';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import QuickActions from './chatbot/QuickActions';
+import ChatMessage from './chatbot/ChatMessage';
+import VoiceSettings from './chatbot/VoiceSettings';
+import ChatHistory from './chatbot/ChatHistory';
 
 // Web Speech API type declarations
 interface SpeechRecognitionEvent extends Event {
@@ -56,6 +58,8 @@ type Message = {
   content: string;
   showLiveChatButton?: boolean;
   images?: string[];
+  suggestions?: string[];
+  timestamp: Date;
 };
 
 type UserRole = 'student' | 'faculty' | 'visitor';
@@ -74,6 +78,8 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [currentPlayingId, setCurrentPlayingId] = useState<string | null>(null);
   const [showLiveChatModal, setShowLiveChatModal] = useState(false);
+  const [voiceSpeed, setVoiceSpeed] = useState(1.0);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -96,7 +102,6 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
     const synth = window.speechSynthesis;
     synth.cancel();
 
-    // Clean text for better speech
     const cleanText = text
       .replace(/[*#_`]/g, '')
       .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
@@ -109,7 +114,7 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.lang = 'en-IN';
-    utterance.rate = 0.95;
+    utterance.rate = voiceSpeed;
     utterance.pitch = 1.05;
     utterance.volume = 1.0;
 
@@ -135,11 +140,10 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
     };
 
     synth.speak(utterance);
-  }, [toast]);
+  }, [toast, voiceSpeed]);
 
-  // TTS function - tries ElevenLabs first, falls back to browser TTS
-  const speakTextDirect = useCallback(async (text: string) => {
-    // Stop any ongoing audio
+  // TTS function
+  const speakTextDirect = useCallback(async (text: string, messageId: string) => {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
@@ -149,6 +153,7 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
     }
     
     setIsSpeaking(true);
+    setCurrentPlayingId(messageId);
 
     try {
       const response = await fetch(
@@ -174,6 +179,7 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
       const audioUrl = URL.createObjectURL(audioBlob);
       
       const audio = new Audio(audioUrl);
+      audio.playbackRate = voiceSpeed;
       audioRef.current = audio;
       
       audio.onended = () => {
@@ -195,16 +201,21 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
       console.error('ElevenLabs TTS error, using browser fallback:', error);
       speakWithBrowserTTS(text);
     }
-  }, [speakWithBrowserTTS]);
+  }, [speakWithBrowserTTS, voiceSpeed]);
 
   const stopSpeaking = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
-      setIsSpeaking(false);
     }
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsSpeaking(false);
+    setCurrentPlayingId(null);
   }, []);
 
+  // Welcome message
   useEffect(() => {
     if (isOpen && messages.length === 0) {
       const welcomeMessages: Record<UserRole, string> = {
@@ -213,9 +224,15 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
         visitor: "Welcome to CMRCET! 👋 I'm your AI Assistant. Ask me about admissions, courses, placements, campus facilities, or anything about our college!"
       };
       const welcomeMsg = welcomeMessages[userRole];
-      setMessages([{ id: '1', role: 'assistant', content: welcomeMsg }]);
+      setMessages([{ 
+        id: '1', 
+        role: 'assistant', 
+        content: welcomeMsg,
+        timestamp: new Date(),
+        suggestions: ['What courses are offered?', 'Tell me about placements', 'How to apply for admission?']
+      }]);
     }
-  }, [isOpen, userRole]);
+  }, [isOpen, userRole, messages.length]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -258,12 +275,18 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
     }
   };
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
+  const handleSend = async (overrideInput?: string) => {
+    const messageText = overrideInput || input;
+    if (!messageText.trim()) return;
 
-    const userMessage: Message = { id: Date.now().toString(), role: 'user', content: input };
+    const userMessage: Message = { 
+      id: Date.now().toString(), 
+      role: 'user', 
+      content: messageText,
+      timestamp: new Date()
+    };
     setMessages((prev) => [...prev, userMessage]);
-    const userInput = input;
+    const userInput = messageText;
     setInput('');
     setIsTyping(true);
     stopSpeaking();
@@ -281,9 +304,19 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
         role: 'assistant', 
         content: data.response,
         showLiveChatButton: data.suggestLiveChat && userRole === 'student',
-        images: data.images
+        images: data.images,
+        suggestions: data.suggestions,
+        timestamp: new Date()
       };
       setMessages((prev) => [...prev, assistantMessage]);
+
+      // Save to conversation if logged in
+      if (userId && currentConversationId) {
+        await supabase.from('chat_messages').insert([
+          { conversation_id: currentConversationId, role: 'user', content: userInput },
+          { conversation_id: currentConversationId, role: 'assistant', content: data.response, images: data.images, suggestions: data.suggestions }
+        ]);
+      }
 
       // Log analytics
       await supabase.from('chatbot_analytics').insert({ user_role: userRole, question: userInput, response: data.response });
@@ -293,7 +326,8 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
       setMessages((prev) => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: errorMsg
+        content: errorMsg,
+        timestamp: new Date()
       }]);
     } finally {
       setIsTyping(false);
@@ -309,6 +343,56 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
     setShowLiveChatModal(true);
   };
 
+  const handleNewConversation = async () => {
+    setMessages([]);
+    setCurrentConversationId(null);
+    
+    if (userId) {
+      try {
+        const { data, error } = await supabase
+          .from('chat_conversations')
+          .insert({ user_id: userId, title: 'New Conversation' })
+          .select()
+          .single();
+        
+        if (!error && data) {
+          setCurrentConversationId(data.id);
+        }
+      } catch (error) {
+        console.error('Error creating conversation:', error);
+      }
+    }
+  };
+
+  const handleSelectConversation = async (conversationId: string) => {
+    setCurrentConversationId(conversationId);
+    
+    try {
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: true });
+      
+      if (!error && data) {
+        setMessages(data.map(msg => ({
+          id: msg.id,
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content,
+          images: msg.images || undefined,
+          suggestions: msg.suggestions || undefined,
+          timestamp: new Date(msg.created_at)
+        })));
+      }
+    } catch (error) {
+      console.error('Error loading conversation:', error);
+    }
+  };
+
+  const handleQuickAction = (query: string) => {
+    handleSend(query);
+  };
+
   return (
     <>
       <button
@@ -320,6 +404,7 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
 
       {isOpen && (
         <div className="fixed bottom-6 right-6 z-50 w-[380px] max-w-[calc(100vw-3rem)] h-[600px] max-h-[calc(100vh-6rem)] bg-card rounded-2xl shadow-medium flex flex-col overflow-hidden border border-border animate-scale-in">
+          {/* Header */}
           <div className="bg-primary text-primary-foreground p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
@@ -333,63 +418,40 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
               </div>
             </div>
             <div className="flex items-center gap-1">
+              <ChatHistory
+                userId={userId}
+                onSelectConversation={handleSelectConversation}
+                onNewConversation={handleNewConversation}
+                currentConversationId={currentConversationId || undefined}
+              />
+              <VoiceSettings onSpeedChange={setVoiceSpeed} />
               <button onClick={() => { stopSpeaking(); setIsOpen(false); }} className="w-8 h-8 rounded-full hover:bg-primary-foreground/10 flex items-center justify-center">
                 <X className="w-5 h-5" />
               </button>
             </div>
           </div>
 
+          {/* Quick Actions */}
+          <QuickActions onAction={handleQuickAction} disabled={isTyping} />
+
+          {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.map((message) => (
-              <div key={message.id} className={`flex flex-col ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
-                <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${message.role === 'user' ? 'bg-primary text-primary-foreground rounded-br-sm' : 'bg-muted text-foreground rounded-bl-sm'}`}>
-                  <div className="text-sm whitespace-pre-wrap prose prose-sm max-w-none">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {message.content}
-                    </ReactMarkdown>
-                  </div>
-                  {/* Display images if present */}
-                  {message.images && message.images.length > 0 && (
-                    <div className="mt-3 grid gap-2">
-                      {message.images.map((img, idx) => (
-                        <img 
-                          key={idx}
-                          src={img}
-                          alt={`CMRCET related image ${idx + 1}`}
-                          className="rounded-lg w-full max-h-40 object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => window.open(img, '_blank')}
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {/* Speaker button for assistant messages */}
-                {message.role === 'assistant' && (
-                  <button
-                    onClick={() => {
-                      if (isSpeaking && currentPlayingId === message.id) {
-                        stopSpeaking();
-                        setCurrentPlayingId(null);
-                      } else {
-                        setCurrentPlayingId(message.id);
-                        speakTextDirect(message.content);
-                      }
-                    }}
-                    className={`mt-1 ml-1 p-1.5 rounded-full hover:bg-muted transition-colors ${
-                      isSpeaking && currentPlayingId === message.id ? 'bg-primary/10 text-primary' : 'text-muted-foreground'
-                    }`}
-                    title={isSpeaking && currentPlayingId === message.id ? "Stop speaking" : "Listen to this response"}
-                  >
-                    {isSpeaking && currentPlayingId === message.id ? (
-                      <VolumeX className="w-4 h-4" />
-                    ) : (
-                      <Volume2 className="w-4 h-4" />
-                    )}
-                  </button>
-                )}
+              <div key={message.id}>
+                <ChatMessage
+                  id={message.id}
+                  role={message.role}
+                  content={message.content}
+                  images={message.images}
+                  suggestions={message.suggestions}
+                  timestamp={message.timestamp}
+                  onSuggestionClick={handleQuickAction}
+                  onSpeak={(text) => speakTextDirect(text, message.id)}
+                  onStopSpeaking={stopSpeaking}
+                  isSpeaking={isSpeaking}
+                  isCurrentlySpeaking={currentPlayingId === message.id}
+                  disabled={isTyping}
+                />
                 {message.showLiveChatButton && (
                   <div className="flex justify-start pl-2 mt-2">
                     <Button 
@@ -416,6 +478,7 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Visitor login prompt */}
           {userRole === 'visitor' && (
             <div className="px-4 py-2 border-t border-border bg-muted/50">
               <p className="text-xs text-muted-foreground text-center mb-2">Login for personalized assistance</p>
@@ -430,6 +493,7 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
             </div>
           )}
 
+          {/* Student live chat button */}
           {userRole === 'student' && (
             <div className="px-4 py-2 border-t border-border bg-muted/50">
               <Button 
@@ -444,6 +508,7 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
             </div>
           )}
 
+          {/* Input area */}
           <div className="p-4 border-t border-border">
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="icon" onClick={toggleVoice} className={isListening ? 'bg-destructive/10 text-destructive' : ''}>
@@ -458,7 +523,7 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
                 className="flex-1 px-4 py-3 bg-muted rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 disabled={isTyping}
               />
-              <Button variant="chat" size="icon" onClick={handleSend} disabled={!input.trim() || isTyping}>
+              <Button variant="chat" size="icon" onClick={() => handleSend()} disabled={!input.trim() || isTyping}>
                 <Send className="w-5 h-5" />
               </Button>
             </div>
@@ -468,8 +533,8 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
 
       {showLiveChatModal && userId && (
         <LiveChatModal 
-          isOpen={showLiveChatModal}
-          onClose={() => setShowLiveChatModal(false)}
+          isOpen={showLiveChatModal} 
+          onClose={() => setShowLiveChatModal(false)} 
           studentId={userId}
         />
       )}
