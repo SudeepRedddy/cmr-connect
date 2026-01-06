@@ -5,7 +5,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import LiveChatModal from './LiveChatModal';
-import QuickActions from './chatbot/QuickActions';
 import ChatMessage from './chatbot/ChatMessage';
 import VoiceSettings from './chatbot/VoiceSettings';
 import ChatHistory from './chatbot/ChatHistory';
@@ -430,9 +429,6 @@ const Chatbot = ({ userRole = 'visitor', userId }: ChatbotProps) => {
               </button>
             </div>
           </div>
-
-          {/* Quick Actions */}
-          <QuickActions onAction={handleQuickAction} disabled={isTyping} />
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
