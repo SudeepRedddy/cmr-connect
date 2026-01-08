@@ -1,15 +1,18 @@
 pipeline {
     agent any
 
-    tools {
-        nodejs 'node25'
-    }
-
     stages {
         stage('Checkout Code') {
             steps {
                 git branch: 'main',
-                    url: 'https://github.com/your-username/your-react-repo.git'
+                    url: 'https://github.com/SudeepRedddy/cmr-connect.git'
+            }
+        }
+
+        stage('Check Node') {
+            steps {
+                bat 'node -v'
+                bat 'npm -v'
             }
         }
 
@@ -24,17 +27,11 @@ pipeline {
                 bat 'npm run build'
             }
         }
-
-        stage('Test (Optional)') {
-            steps {
-                sh 'npm test -- --watchAll=false'
-            }
-        }
     }
 
     post {
         success {
-            echo 'Build Successful'
+            echo 'React Build Successful'
         }
         failure {
             echo 'Build Failed'
