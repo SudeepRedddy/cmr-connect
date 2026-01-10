@@ -1,37 +1,40 @@
 pipeline {
     agent any
 
+    tools {
+        nodejs 'NodeJS'
+    }
+
     stages {
-        stage('Checkout Code') {
+        stage('Clone Repository') {
             steps {
                 git branch: 'main',
                     url: 'https://github.com/SudeepRedddy/cmr-connect.git'
             }
         }
 
-        stage('Check Node') {
-            steps {
-                bat 'node -v'
-                bat 'npm -v'
-            }
-        }
-
         stage('Install Dependencies') {
             steps {
-                bat 'npm install'
+                sh 'npm install'
             }
         }
 
-        stage('Build React App') {
+        stage('Build Project') {
             steps {
-                bat 'npm run build'
+                sh 'npm run build'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'npm test -- --watchAll=false'
             }
         }
     }
 
     post {
         success {
-            echo 'React Build Successful'
+            echo 'Build Successful'
         }
         failure {
             echo 'Build Failed'
