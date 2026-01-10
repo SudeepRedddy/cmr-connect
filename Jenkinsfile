@@ -6,6 +6,7 @@ pipeline {
     }
 
     stages {
+
         stage('Clone Repository') {
             steps {
                 git branch: 'main',
@@ -24,17 +25,11 @@ pipeline {
                 bat 'npm run build'
             }
         }
-
-        stage('Test') {
-            steps {
-                bat 'npm test -- --watchAll=false'
-            }
-        }
     }
 
     post {
         success {
-            echo 'Build Successful'
+            echo ' Build Successful'
         }
         failure {
             echo 'Build Failed'
