@@ -25,6 +25,12 @@ pipeline {
                 bat 'npm run build'
             }
         }
+
+        stage('Run/Deploy Project') {
+            steps {
+                bat 'npm run dev'
+            }
+        }
     }
 
     post {
